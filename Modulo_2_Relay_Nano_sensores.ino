@@ -1,8 +1,23 @@
-
-//#include <TimerOne.h>
+#include <Filters.h>
 #include <SPI.h>
 #include <mcp_can.h>
 #include <EEPROM.h>
+
+////////////////////////////////////////
+
+float testFrequency = 60;                     // test signal frequency (Hz)
+float windowLength = 20.0/testFrequency;     // how long to average the signal, for statistist
+int sensorValue = 0;
+float intercept = -0.1129; // to be adjusted based on calibration testing
+float slope = 0.0405; // to be adjusted based on calibration testing
+float current_amps; // estimated actual current in amps
+
+unsigned long printPeriod = 1000; // in milliseconds
+// Track time in milliseconds since last reading 
+unsigned long previousMillis = 0;
+
+//////////////////////////////////////////
+
 
 const int SPI_CS_PIN = 10;//pin 9 en modulo 1 relay Atmega328p
 const int interrupcion = 9;//pin 5 en modulo 1 relay Atmega328p
@@ -106,6 +121,7 @@ START_INIT:
 
 void loop()
 {         
+   
     if(!digitalRead(interrupcion)) {
          // noInterrupts();               // Suspende las interrupciones
           CAN.readMsgBuf(&len, buf);    // leo el mensaje recibido
@@ -169,7 +185,7 @@ void loop()
               
                 }
                 if(0x02==MsgLeido[0]){    //si el control es 02 lee acs712 y envia info al bus
-                
+              
                  Consumo_ACS712();
                    }
             }
@@ -272,6 +288,23 @@ void loop()
   }
 
 void Consumo_ACS712() {
+   RunningStatistics inputStats;                 // create statistics to look at the raw test signal
+   inputStats.setWindowSecs( windowLength );
+
+    sensorValue = analogRead(Acs712_2);  // read the analog in value:
+    inputStats.input(sensorValue);  // log to Stats function
+        
+    if((unsigned long)(millis() - previousMillis) >= printPeriod) {
+      previousMillis = millis();   // update time
+      
+      // display current values to the screen
+      Serial.print( "\n" );
+      // output sigma or variation values associated with the inputValue itsel
+      Serial.print( "\tsigma: " ); Serial.print( inputStats.sigma() );
+      // convert signal sigma value to current in amps
+      current_amps = intercept + slope * inputStats.sigma();
+      Serial.print( "\tamps: " ); Serial.print( current_amps );
+    }
  
   acs_1=analogRead(Acs712_1);
   acs_2=analogRead(Acs712_2);
@@ -283,6 +316,9 @@ void Consumo_ACS712() {
   Serial.print(acs_1);
   Serial.print(" ACS712 2:");
   Serial.println(acs_2);
+
+
+  
  
  }
 
