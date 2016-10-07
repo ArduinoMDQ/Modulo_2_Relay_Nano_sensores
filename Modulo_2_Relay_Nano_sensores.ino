@@ -1,23 +1,7 @@
-#include <Filters.h>
+
 #include <SPI.h>
 #include <mcp_can.h>
 #include <EEPROM.h>
-
-////////////////////////////////////////
-
-float testFrequency = 60;                     // test signal frequency (Hz)
-float windowLength = 20.0/testFrequency;     // how long to average the signal, for statistist
-int sensorValue = 0;
-float intercept = -0.1129; // to be adjusted based on calibration testing
-float slope = 0.0405; // to be adjusted based on calibration testing
-float current_amps; // estimated actual current in amps
-
-unsigned long printPeriod = 1000; // in milliseconds
-// Track time in milliseconds since last reading 
-unsigned long previousMillis = 0;
-
-//////////////////////////////////////////
-
 
 const int SPI_CS_PIN = 10;//pin 9 en modulo 1 relay Atmega328p
 const int interrupcion = 9;//pin 5 en modulo 1 relay Atmega328p
@@ -51,7 +35,15 @@ unsigned char buf[8];
 
 int acs_1,acs_2;
 
-
+/*
+Measuring AC Current Using ACS712
+*/
+const int sensorIn = A6;
+int mVperAmp = 185; // use 100 for 20A Module and 66 for 30A Module
+double Voltage = 0;
+double VRMS = 0;
+double AmpsRMS = 0;
+////////////////////////////////
 
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
 
@@ -78,7 +70,7 @@ void setup()
     MsgUpEEprom[0]=ID_Local;
     MsgUpEEprom[1]=ID_Master;
     
-  pinMode(LED,OUTPUT);
+    pinMode(LED,OUTPUT);
     pinMode(Relay_1,OUTPUT);
     digitalWrite(Relay_1,true);
     pinMode(Relay_2,OUTPUT);
@@ -287,39 +279,35 @@ void loop()
            delay(1000);
   }
 
-void Consumo_ACS712() {
-   RunningStatistics inputStats;                 // create statistics to look at the raw test signal
-   inputStats.setWindowSecs( windowLength );
 
-    sensorValue = analogRead(Acs712_2);  // read the analog in value:
-    inputStats.input(sensorValue);  // log to Stats function
-        
-    if((unsigned long)(millis() - previousMillis) >= printPeriod) {
-      previousMillis = millis();   // update time
-      
-      // display current values to the screen
-      Serial.print( "\n" );
-      // output sigma or variation values associated with the inputValue itsel
-      Serial.print( "\tsigma: " ); Serial.print( inputStats.sigma() );
-      // convert signal sigma value to current in amps
-      current_amps = intercept + slope * inputStats.sigma();
-      Serial.print( "\tamps: " ); Serial.print( current_amps );
-    }
- 
-  acs_1=analogRead(Acs712_1);
+
+
+
+void Consumo_ACS712() {
+ /* acs_1=analogRead(Acs712_1);
   acs_2=analogRead(Acs712_2);
   conversor(1,acs_1);
-  conversor(2,acs_2);
-  MsgAcs712[0]= 0xAC;
-  CAN.sendMsgBuf(ID_Local,0,8,MsgAcs712);
-  Serial.print("ACS712 1:");
-  Serial.print(acs_1);
-  Serial.print(" ACS712 2:");
-  Serial.println(acs_2);
-
-
+  conversor(2,acs_2);*/
+float ajuste=-.08;
+ float AmpFinalRMS=0;
+  Voltage = getVPP();
+  VRMS = (Voltage/2.0) *0.707; 
+  AmpsRMS = (VRMS * 1000)/mVperAmp;
+ AmpFinalRMS=AmpsRMS+ajuste;
+  Serial.print(AmpFinalRMS);
+  Serial.print(" AmpsRMS    ");
+  if((AmpFinalRMS)>.2){
+    Serial.println("Lampara ON");
+    Led_Blink(3);
+     MsgAcs712[7]= 0x0F;
+    }
+  else{
+     Serial.println("Lampara OFF");
+       MsgAcs712[7]= 0x00;
+    }
   
- 
+  MsgAcs712[0]= 0xAC;
+   CAN.sendMsgBuf(ID_Local,0,8,MsgAcs712);
  }
 
 
@@ -366,7 +354,36 @@ void Consumo_ACS712() {
     }
   }
 
-
+float getVPP()
+{
+  float result;
+  
+  int readValue;             //value read from the sensor
+  int maxValue = 0;          // store max value here
+  int minValue = 1024;          // store min value here
+  
+   uint32_t start_time = millis();
+   while((millis()-start_time) < 40) //sample for 1 Sec
+   {
+       readValue = analogRead(Acs712_1);
+       // see if you have a new maxValue
+       if (readValue > maxValue) 
+       {
+           /*record the maximum sensor value*/
+           maxValue = readValue;
+       }
+       if (readValue < minValue) 
+       {
+           /*record the maximum sensor value*/
+           minValue = readValue;
+       }
+   }
+   
+   // Subtract min from max
+   result = ((maxValue - minValue) * 5.0)/1024.0;
+      
+   return result;
+ }
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
