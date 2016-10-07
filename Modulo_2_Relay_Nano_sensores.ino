@@ -288,15 +288,18 @@ void Consumo_ACS712() {
   acs_2=analogRead(Acs712_2);
   conversor(1,acs_1);
   conversor(2,acs_2);*/
-float ajuste=-.08;
- float AmpFinalRMS=0;
+  float ajuste=-.08;
+  float AmpFinalRMS=0;
+ 
   Voltage = getVPP();
   VRMS = (Voltage/2.0) *0.707; 
   AmpsRMS = (VRMS * 1000)/mVperAmp;
- AmpFinalRMS=AmpsRMS+ajuste;
+  AmpFinalRMS=AmpsRMS+ajuste;
+  
   Serial.print(AmpFinalRMS);
   Serial.print(" AmpsRMS    ");
-  if((AmpFinalRMS)>.2){
+  
+  if(AmpFinalRMS > 0.02){
     Serial.println("Lampara ON");
     Led_Blink(3);
      MsgAcs712[7]= 0x0F;
