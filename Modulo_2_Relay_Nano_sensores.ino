@@ -290,12 +290,26 @@ void Consumo_ACS712() {
   conversor(2,acs_2);*/
   float ajuste=-.08;
   float AmpFinalRMS=0;
- 
-  Voltage = getVPP();
+  float Voltaje;
+ // Voltage = getVPP();
+  Voltaje=TrueRMS();
   VRMS = (Voltage/2.0) *0.707; 
-  AmpsRMS = (VRMS * 1000)/mVperAmp;
+//  AmpsRMS = (VRMS * 1000)/mVperAmp;
+   AmpsRMS=(Voltaje * 1000)/mVperAmp;
+ Serial.print(" AmpsRMS    ");
+ Serial.println(AmpsRMS);
+ 
   AmpFinalRMS=AmpsRMS+ajuste;
+
+
+  Voltaje=TrueRMSMuestras();
+  VRMS = (Voltage/2.0) *0.707; 
+  AmpsRMS=(Voltaje * 1000)/mVperAmp;
+  Serial.print(" AmpsRMSMuestras    ");
+  Serial.println(AmpsRMS);
+
   
+  /*
   Serial.print(AmpFinalRMS);
   Serial.print(" AmpsRMS    ");
   
@@ -308,6 +322,7 @@ void Consumo_ACS712() {
      Serial.println("Lampara OFF");
        MsgAcs712[7]= 0x00;
     }
+  */
   
   MsgAcs712[0]= 0xAC;
    CAN.sendMsgBuf(ID_Local,0,8,MsgAcs712);
@@ -356,6 +371,51 @@ void Consumo_ACS712() {
           
     }
   }
+
+
+float TrueRMSMuestras()
+{
+  float result=0,conv=0,Acumulador=0,suma=0;
+  int readValue;             //value read from the sensor
+  int Count=0;
+  uint32_t start_time = millis();
+  
+  while(Count < 2000) 
+   {   
+       Count++;
+       readValue = analogRead(Acs712_1);
+       conv=(readValue * 5.0)/1024.0;
+       Acumulador=Acumulador+sq(conv);
+      
+   }
+     suma=Acumulador/Count;
+     result=sqrt(suma);
+     return result;
+    }
+
+  
+
+float TrueRMS()
+{
+  float result=0,conv=0,Acumulador=0,suma=0;
+  int readValue;             //value read from the sensor
+  int Count=0;
+  uint32_t start_time = millis();
+  
+  while((millis()-start_time) < 100) 
+   {   
+       Count++;
+       readValue = analogRead(Acs712_1);
+       conv=(readValue * 5.0)/1024.0;
+       Acumulador=Acumulador+sq(conv);
+      
+   }
+     suma=Acumulador/Count;
+     result=sqrt(suma);
+     return result;
+    }
+
+
 
 float getVPP()
 {
